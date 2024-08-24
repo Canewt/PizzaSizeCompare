@@ -7,6 +7,7 @@ interface Results {
   smallValue: number;
   mediumValue: number;
   bestOption: string;
+  comparisonType: 'price' | 'size';
 }
 
 export default function Home() {
@@ -22,41 +23,43 @@ export default function Home() {
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
 
-    const largeDiameter = Number(data.largeDiameter as string);
-    const largePrice = data.largePrice ? Number(data.largePrice as string) : 1; // Default price to 1 if not provided
-    const largeQuantity = Number(data.largeQuantity as string);
+    const pizzas = [
+      { size: 'large', diameter: Number(data.largeDiameter as string), price: Number(data.largePrice as string) || null, quantity: Number(data.largeQuantity as string) },
+      { size: 'medium', diameter: Number(data.mediumDiameter as string), price: Number(data.mediumPrice as string) || null, quantity: Number(data.mediumQuantity as string) },
+      { size: 'small', diameter: Number(data.smallDiameter as string), price: Number(data.smallPrice as string) || null, quantity: Number(data.smallQuantity as string) }
+    ].filter(pizza => pizza.diameter && pizza.quantity);
 
-    const smallDiameter = Number(data.smallDiameter as string);
-    const smallPrice = data.smallPrice ? Number(data.smallPrice as string) : 1; // Default price to 1 if not provided
-    const smallQuantity = Number(data.smallQuantity as string);
+    const pizzasWithPrices = pizzas.filter(pizza => pizza.price !== null);
 
-    const mediumDiameter = Number(data.mediumDiameter as string);
-    const mediumPrice = data.mediumPrice ? Number(data.mediumPrice as string) : 1; // Default price to 1 if not provided
-    const mediumQuantity = Number(data.mediumQuantity as string);
+    let comparisonResults;
+    if (pizzasWithPrices.length >= 2) {
+      // Compare pizzas with prices
+      comparisonResults = pizzasWithPrices.map(pizza => ({
+        ...pizza,
+        value: calculatePizzaValue(pizza.diameter, pizza.price!) * pizza.quantity
+      }));
+    } else {
+      // Compare just sizes
+      comparisonResults = pizzas.map(pizza => ({
+        ...pizza,
+        value: calculatePizzaValue(pizza.diameter) * pizza.quantity
+      }));
+    }
 
-    const largeValue = largeDiameter && largeQuantity ? calculatePizzaValue(largeDiameter, largePrice) * largeQuantity : 0;
-    const smallValue = smallDiameter && smallQuantity ? calculatePizzaValue(smallDiameter, smallPrice) * smallQuantity : 0;
-    const mediumValue = mediumDiameter && mediumQuantity ? calculatePizzaValue(mediumDiameter, mediumPrice) * mediumQuantity : 0;
-
-    const values = [
-      { value: largeValue, label: `${largeQuantity} large pizza(s)` },
-      { value: smallValue, label: `${smallQuantity} small pizza(s)` },
-      { value: mediumValue, label: `${mediumQuantity} medium pizza(s)` },
-    ].filter(item => item.value > 0);
-
-    if (values.length === 0) {
+    if (comparisonResults.length === 0) {
       setResults(null);
       return;
     }
 
-    const bestValue = Math.max(...values.map(item => item.value));
-    const bestOption = values.find(item => item.value === bestValue)?.label || '';
+    const bestValue = Math.max(...comparisonResults.map(item => item.value));
+    const bestOption = comparisonResults.find(item => item.value === bestValue);
 
     setResults({
-      largeValue,
-      smallValue,
-      mediumValue,
-      bestOption: `${bestOption} offer the best value.`,
+      largeValue: comparisonResults.find(item => item.size === 'large')?.value || 0,
+      mediumValue: comparisonResults.find(item => item.size === 'medium')?.value || 0,
+      smallValue: comparisonResults.find(item => item.size === 'small')?.value || 0,
+      bestOption: `${bestOption!.quantity} ${bestOption!.size} pizza(s) offer the best value.`,
+      comparisonType: pizzasWithPrices.length >= 2 ? 'price' : 'size'
     });
   };
 
@@ -122,9 +125,10 @@ export default function Home() {
       {results && (
         <div className="mt-8 bg-green-50 p-4 rounded-lg max-w-2xl mx-auto border-2 border-black shadow-bottom"> {/* Light green background for results */}
           <h2 className="text-2xl font-bold mb-2 text-black">Results</h2>
-          <p className="text-gray-800">Large Pizza: {results.largeValue.toFixed(2)} sq inches per dollar</p>
-          <p className="text-gray-800">Small Pizzas: {results.smallValue.toFixed(2)} sq inches per dollar</p>
-          <p className="text-gray-800">Medium Pizzas: {results.mediumValue.toFixed(2)} sq inches per dollar</p>
+          <p className="text-gray-800">Comparison based on: {results.comparisonType === 'price' ? 'Price and Size' : 'Size only'}</p>
+          {results.largeValue > 0 && <p className="text-gray-800">Large Pizza: {results.largeValue.toFixed(2)} {results.comparisonType === 'price' ? 'sq inches per dollar' : 'sq inches'}</p>}
+          {results.mediumValue > 0 && <p className="text-gray-800">Medium Pizzas: {results.mediumValue.toFixed(2)} {results.comparisonType === 'price' ? 'sq inches per dollar' : 'sq inches'}</p>}
+          {results.smallValue > 0 && <p className="text-gray-800">Small Pizzas: {results.smallValue.toFixed(2)} {results.comparisonType === 'price' ? 'sq inches per dollar' : 'sq inches'}</p>}
           <p className="font-bold mt-2 text-black">{results.bestOption}</p>
         </div>
       )}
